@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build stage
 FROM amd64/debian:bookworm-slim AS builder
 
@@ -7,25 +8,36 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY conanfile.txt CMakeLists.txt ./
-COPY src/ ./src/
 
+# Layer 1: dependency manifest only — invalidated when conanfile.txt changes.
+# conan install is expensive (compiles libwebsockets etc.) so keep it separate
+# from the source COPY so source changes don't retrigger a full dep rebuild.
+COPY conanfile.txt CMakeLists.txt ./
 RUN conan profile detect --force && \
     conan install . \
         --build=missing \
         -s build_type=Release \
-        -s compiler.cppstd=17 && \
-    cmake -B cmake-build \
+        -s compiler.cppstd=17
+
+# Layer 2: source — invalidated on every source change, cmake build only.
+COPY src/ ./src/
+RUN cmake -B cmake-build \
         -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_TOOLCHAIN_FILE=Release/generators/conan_toolchain.cmake && \
     cmake --build cmake-build --target emqx-auth-agent
 
-# Runtime stage
+# Test stage (optional target for CI)
+FROM builder AS test-runner
+COPY tests/ ./tests/
+RUN cmake --build cmake-build --target run_tests && \
+    ctest --test-dir cmake-build --output-on-failure
+
+# Runtime stage — minimal image, no build tools
 FROM amd64/debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libssl3 curl && \
+        curl && \
     rm -rf /var/lib/apt/lists/* && \
     useradd -r -s /bin/false appuser
 
