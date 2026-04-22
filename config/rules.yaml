@@ -1,0 +1,74 @@
+# EMQX mTLS Authorization Rules
+#
+# Rule matching:
+#   Rules are evaluated in descending specificity order:
+#     O+OU match (6) > OU-only (4) > O-only (2) > wildcard (0)
+#   Within the same specificity level, YAML file order is preserved.
+#   First matching rule wins; if its identity matches but no topic pattern
+#   matches, evaluation falls through to the next (less specific) rule.
+#
+# match fields:
+#   o:  Certificate O (Organization). Exact match (case-insensitive), or
+#       "*" / omit to match any value.
+#   ou: Certificate OU (Organizational Unit). Same semantics. Omit to match any.
+#       If the certificate contains multiple OU values, any one match suffices.
+#
+# Topic patterns:
+#   +      Single-level MQTT wildcard
+#   #      Multi-level MQTT wildcard (must be the last segment)
+#   {cn}   Replaced with the client certificate's Common Name at request time
+
+rules:
+  # O+OU: AcmeCorp floor-sensor devices
+  - id: acmecorp-floor-sensors
+    match:
+      o: AcmeCorp
+      ou: floor-sensors
+    allow:
+      publish:
+        - sensors/+/data
+        - sensors/+/status
+        - devices/{cn}/telemetry
+      subscribe:
+        - cmd/sensors/+
+        - devices/{cn}/cmd
+        - config/sensors/#
+
+  # O+OU: AcmeCorp admin users — full access
+  - id: acmecorp-admin
+    match:
+      o: AcmeCorp
+      ou: admin
+    allow:
+      publish:
+        - "#"
+      subscribe:
+        - "#"
+
+  # O-only catch-all: any AcmeCorp device not matched by a more specific rule
+  - id: acmecorp-default
+    match:
+      o: AcmeCorp
+    allow:
+      subscribe:
+        - announcements/#
+        - status/+
+    deny:
+      publish:
+        - "#"
+      subscribe:
+        - cmd/#
+
+  # O+OU: external partner dashboard — read-only sensor data
+  - id: partnerorg-readonly
+    match:
+      o: PartnerOrg
+      ou: dashboard
+    allow:
+      publish: []
+      subscribe:
+        - sensors/#
+        - status/#
+    deny:
+      publish:
+        - "#"

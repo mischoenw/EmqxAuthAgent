@@ -1,0 +1,13 @@
+[requires]
+libwebsockets/4.3.3
+yaml-cpp/0.8.0
+nlohmann_json/3.11.3
+gtest/1.14.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[options]
+libwebsockets/*:with_ssl=True
+libwebsockets/*:with_http=True

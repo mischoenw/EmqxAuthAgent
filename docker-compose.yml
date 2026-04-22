@@ -1,0 +1,46 @@
+services:
+  emqx-auth-agent:
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    container_name: emqx-auth-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount rules.yaml as a volume to allow live updates via /admin/reload
+      - ./config/rules.yaml:/app/config/rules.yaml:ro
+    environment:
+      - RULES_CONFIG=/app/config/rules.yaml
+      - PORT=8000
+      - LOG_LEVEL=INFO
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-changeme}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - emqx-net
+
+  # Optional: local EMQX instance for integration testing
+  emqx:
+    image: emqx/emqx:5.6.0
+    container_name: emqx
+    ports:
+      - "1883:1883"    # MQTT plain
+      - "8883:8883"    # MQTT/TLS (mTLS)
+      - "18083:18083"  # Dashboard
+    volumes:
+      - ./emqx_config_example/authorization.conf:/opt/emqx/etc/authorization.conf:ro
+    depends_on:
+      emqx-auth-agent:
+        condition: service_healthy
+    networks:
+      - emqx-net
+
+networks:
+  emqx-net:
+    driver: bridge
