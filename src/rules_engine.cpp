@@ -127,6 +127,12 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
                              const std::string& action) {
     bool is_publish = (action == "publish");
 
+    // Build placeholder values from the first O and OU in the cert DN.
+    TopicPlaceholders ph;
+    ph.cn = dn.cn;
+    ph.o  = dn.o_values.empty()  ? "" : dn.o_values[0];
+    ph.ou = dn.ou_values.empty() ? "" : dn.ou_values[0];
+
     for (const auto& rule : rules) {
         if (!identity_matches(rule, dn)) continue;
 
@@ -135,21 +141,19 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
 
         // Explicit deny within matched rule wins over allow
         for (const auto& pat : deny_list) {
-            if (matches_topic(pat, topic, dn.cn)) {
+            if (matches_topic(pat, topic, ph)) {
                 std::cout << "[DENY] rule=" << rule.id
-                          << " cn=" << dn.cn
-                          << " topic=" << topic
-                          << " action=" << action
+                          << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
+                          << " topic=" << topic << " action=" << action
                           << " deny_pattern=" << pat << "\n";
                 return AuthzResult::Deny;
             }
         }
         for (const auto& pat : allow_list) {
-            if (matches_topic(pat, topic, dn.cn)) {
+            if (matches_topic(pat, topic, ph)) {
                 std::cout << "[ALLOW] rule=" << rule.id
-                          << " cn=" << dn.cn
-                          << " topic=" << topic
-                          << " action=" << action
+                          << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
+                          << " topic=" << topic << " action=" << action
                           << " allow_pattern=" << pat << "\n";
                 return AuthzResult::Allow;
             }
@@ -159,9 +163,8 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
     }
 
     std::cout << "[DENY] no matching rule"
-              << " cn=" << dn.cn
-              << " topic=" << topic
-              << " action=" << action << "\n";
+              << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
+              << " topic=" << topic << " action=" << action << "\n";
     return AuthzResult::Deny;
 }
 

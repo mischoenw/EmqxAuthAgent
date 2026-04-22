@@ -23,19 +23,33 @@ static std::vector<std::string> split_slash(const std::string& s) {
     return parts;
 }
 
-static std::string substitute_cn(const std::string& pattern, const std::string& cn) {
-    const std::string placeholder = "{cn}";
+static std::string substitute_one(const std::string& s,
+                                   const std::string& placeholder,
+                                   const std::string& escaped_value) {
     std::string result;
-    std::string escaped = regex_escape(cn);
     size_t pos = 0;
     while (true) {
-        size_t found = pattern.find(placeholder, pos);
-        if (found == std::string::npos) { result += pattern.substr(pos); break; }
-        result += pattern.substr(pos, found - pos);
-        result += escaped;
+        size_t found = s.find(placeholder, pos);
+        if (found == std::string::npos) { result += s.substr(pos); break; }
+        result += s.substr(pos, found - pos);
+        result += escaped_value;
         pos = found + placeholder.size();
     }
     return result;
+}
+
+static bool has_any_placeholder(const std::string& pattern) {
+    return pattern.find("{cn}") != std::string::npos ||
+           pattern.find("{o}")  != std::string::npos ||
+           pattern.find("{ou}") != std::string::npos;
+}
+
+static std::string substitute_placeholders(const std::string& pattern,
+                                           const TopicPlaceholders& ph) {
+    std::string s = substitute_one(pattern, "{cn}", regex_escape(ph.cn));
+    s             = substitute_one(s,       "{o}",  regex_escape(ph.o));
+    s             = substitute_one(s,       "{ou}", regex_escape(ph.ou));
+    return s;
 }
 
 // Build a std::regex from an MQTT topic pattern (after {cn} substitution).
@@ -89,7 +103,7 @@ void validate_topic_pattern(const std::string& pattern) {
 }
 
 void precompile_static_pattern(const std::string& pattern) {
-    if (pattern.find("{cn}") != std::string::npos) return;
+    if (has_any_placeholder(pattern)) return;
     std::lock_guard<std::mutex> lock(s_cache_mutex);
     if (!s_pattern_cache.count(pattern))
         s_pattern_cache.emplace(pattern, build_pattern_regex(pattern));
@@ -97,10 +111,8 @@ void precompile_static_pattern(const std::string& pattern) {
 
 bool matches_topic(const std::string& pattern,
                    const std::string& topic,
-                   const std::string& cn) {
-    bool has_placeholder = pattern.find("{cn}") != std::string::npos;
-
-    if (!has_placeholder) {
+                   const TopicPlaceholders& ph) {
+    if (!has_any_placeholder(pattern)) {
         std::lock_guard<std::mutex> lock(s_cache_mutex);
         auto it = s_pattern_cache.find(pattern);
         if (it != s_pattern_cache.end())
@@ -111,8 +123,8 @@ bool matches_topic(const std::string& pattern,
         return std::regex_match(topic, ins_it->second);
     }
 
-    // {cn} patterns compiled on the fly (CN varies per device)
-    std::string resolved = substitute_cn(pattern, cn);
+    // Dynamic pattern: substitute cert fields and compile on the fly.
+    std::string resolved = substitute_placeholders(pattern, ph);
     auto re = build_pattern_regex(resolved);
     return std::regex_match(topic, re);
 }

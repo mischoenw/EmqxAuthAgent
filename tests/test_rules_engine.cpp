@@ -3,7 +3,6 @@
 #include <fstream>
 #include <filesystem>
 
-// Write a temporary rules.yaml and return the path.
 static std::string write_rules(const std::string& yaml,
                                 const std::filesystem::path& dir) {
     auto path = dir / "rules.yaml";
@@ -12,57 +11,46 @@ static std::string write_rules(const std::string& yaml,
     return path.string();
 }
 
+// Rules matching the real config:
+//   O  = 8-char org id (e.g. aabbccdd)
+//   OU = 4+4 unit id  (e.g. 0001-0001)
+//   Topic: /{o}/{ou}/#
 static const char* SAMPLE_RULES = R"yaml(
 rules:
-  - id: acmecorp-sensors
-    match:
-      o: AcmeCorp
-      ou: sensors
+  - id: device-own-namespace
     allow:
       publish:
-        - sensors/+/data
-        - devices/{cn}/status
+        - "/{o}/{ou}/#"
       subscribe:
-        - cmd/sensors/+
+        - "/{o}/{ou}/#"
+)yaml";
 
-  - id: acmecorp-admin
+// Extended rules for layered-rule tests
+static const char* LAYERED_RULES = R"yaml(
+rules:
+  - id: admin-full-access
     match:
-      o: AcmeCorp
+      o: aabbccdd
       ou: admin
     allow:
       publish: ["#"]
       subscribe: ["#"]
 
-  - id: acmecorp-default
-    match:
-      o: AcmeCorp
+  - id: device-own-namespace
     allow:
+      publish:
+        - "/{o}/{ou}/#"
       subscribe:
-        - announcements/#
-        - status/+
-    deny:
-      publish: ["#"]
-
-  - id: partnerorg-dashboard
-    match:
-      o: PartnerOrg
-      ou: dashboard
-    allow:
-      subscribe:
-        - sensors/#
-    deny:
-      publish: ["#"]
+        - "/{o}/{ou}/#"
 )yaml";
 
 class RulesEngineTest : public ::testing::Test {
 protected:
     std::filesystem::path tmp_dir_;
-    std::string rules_path_;
 
     void SetUp() override {
-        tmp_dir_    = std::filesystem::temp_directory_path() / "authz_test";
+        tmp_dir_ = std::filesystem::temp_directory_path() / "authz_test";
         std::filesystem::create_directories(tmp_dir_);
-        rules_path_ = write_rules(SAMPLE_RULES, tmp_dir_);
     }
     void TearDown() override {
         std::filesystem::remove_all(tmp_dir_);
@@ -84,123 +72,118 @@ protected:
     }
 };
 
-TEST_F(RulesEngineTest, AllowSensorPublish) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,O=AcmeCorp", "dev1",
-                      "sensors/floor1/data", "publish");
+// ---- Basic allow/deny with {o}/{ou} namespace ----
+
+TEST_F(RulesEngineTest, AllowPublishOwnNamespace) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001/sensor/temp", "publish");
     EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
 }
 
-TEST_F(RulesEngineTest, DenySensorWrongTopic) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,O=AcmeCorp", "dev1",
-                      "cmd/floor1/data", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
-
-TEST_F(RulesEngineTest, AllowCnSpecificTopic) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,O=AcmeCorp", "dev1",
-                      "devices/dev1/status", "publish");
+TEST_F(RulesEngineTest, AllowSubscribeOwnNamespace) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001/cmd/restart", "subscribe");
     EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
 }
 
-TEST_F(RulesEngineTest, DenyCnWrongDevice) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,O=AcmeCorp", "dev1",
-                      "devices/dev2/status", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
-
-TEST_F(RulesEngineTest, AdminSuperuserPublish) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=admin1,OU=admin,O=AcmeCorp", "admin1",
-                      "any/random/topic", "publish");
+TEST_F(RulesEngineTest, AllowBaseTopicWithoutSuffix) {
+    // /{o}/{ou}/# also matches /{o}/{ou} itself
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001", "subscribe");
     EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
 }
 
-TEST_F(RulesEngineTest, AdminSuperuserSubscribe) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=admin1,OU=admin,O=AcmeCorp", "admin1",
-                      "cmd/sensitive", "subscribe");
+TEST_F(RulesEngineTest, DenyWrongOU) {
+    // Device with OU=0001-0001 must not access OU=0002-0001 namespace
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0002-0001/sensor/temp", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+}
+
+TEST_F(RulesEngineTest, DenyWrongO) {
+    // Device with O=aabbccdd must not access O=bbccddee namespace
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/bbccddee/0001-0001/sensor/temp", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+}
+
+TEST_F(RulesEngineTest, DenyMissingLeadingSlash) {
+    // Pattern is /{o}/{ou}/# — topic without leading slash must not match
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "aabbccdd/0001-0001/sensor/temp", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+}
+
+TEST_F(RulesEngineTest, DenyEmptyCertSubject) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("", "", "/aabbccdd/0001-0001/x", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+}
+
+TEST_F(RulesEngineTest, DenyInvalidAction) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001/x", "read");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+}
+
+// ---- Different devices in same org but different OU are isolated ----
+
+TEST_F(RulesEngineTest, TwoDevicesIsolated) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+
+    auto r1 = make_req("CN=d1,OU=0001-0001,O=aabbccdd", "d1",
+                       "/aabbccdd/0001-0001/temp", "publish");
+    auto r2 = make_req("CN=d2,OU=0002-0002,O=aabbccdd", "d2",
+                       "/aabbccdd/0001-0001/temp", "publish");  // wrong namespace!
+
+    EXPECT_EQ(engine.authorize(r1), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r2), AuthzResult::Deny);
+}
+
+// ---- Layered rules (O+OU specific + wildcard fallback) ----
+
+TEST_F(RulesEngineTest, AdminSuperuser) {
+    RulesEngine engine(write_rules(LAYERED_RULES, tmp_dir_));
+    auto r = make_req("CN=admin1,OU=admin,O=aabbccdd", "admin1",
+                      "/any/arbitrary/topic", "publish");
     EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
 }
 
-TEST_F(RulesEngineTest, FallthroughToDefaultSubscribe) {
-    // sensors device requests announcements/# — not in OU rule, falls to O-only default
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,O=AcmeCorp", "dev1",
-                      "announcements/general", "subscribe");
+TEST_F(RulesEngineTest, NonAdminFallsToNamespaceRule) {
+    RulesEngine engine(write_rules(LAYERED_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001/sensor", "publish");
     EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
 }
 
-TEST_F(RulesEngineTest, DefaultDenyPublishForUnknownOU) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=d,OU=unknown,O=AcmeCorp", "d",
-                      "sensors/x/data", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
-
-TEST_F(RulesEngineTest, UnknownOrgDeny) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=d,O=OtherCorp", "d",
-                      "sensors/x", "subscribe");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
-
-TEST_F(RulesEngineTest, MultipleOUMatchesFirstRule) {
-    // Cert has both OU=sensors and OU=devices — should match sensors rule
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,OU=devices,O=AcmeCorp", "dev1",
-                      "sensors/floor1/data", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
-}
-
-TEST_F(RulesEngineTest, EmptyCertSubjectDeny) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("", "", "sensors/x/data", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
-
-TEST_F(RulesEngineTest, PartnerAllowSubscribe) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dash1,OU=dashboard,O=PartnerOrg", "dash1",
-                      "sensors/floor1/data", "subscribe");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
-}
-
-TEST_F(RulesEngineTest, PartnerDenyPublish) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dash1,OU=dashboard,O=PartnerOrg", "dash1",
-                      "sensors/floor1/data", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
-
-TEST_F(RulesEngineTest, InvalidActionDeny) {
-    RulesEngine engine(rules_path_);
-    auto r = make_req("CN=dev1,OU=sensors,O=AcmeCorp", "dev1",
-                      "sensors/floor1/data", "invalid_action");
-    // "invalid_action" is neither publish nor subscribe — falls through all rules
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
-}
+// ---- Metadata ----
 
 TEST_F(RulesEngineTest, RulesCount) {
-    RulesEngine engine(rules_path_);
-    EXPECT_EQ(engine.rules_count(), 4u);
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    EXPECT_EQ(engine.rules_count(), 1u);
 }
 
 TEST_F(RulesEngineTest, Reload) {
-    RulesEngine engine(rules_path_);
-    // Overwrite with simpler rules
-    write_rules(R"yaml(
-rules:
-  - id: allow-all
-    allow:
-      publish: ["#"]
-      subscribe: ["#"]
-)yaml", tmp_dir_);
+    auto path = write_rules(SAMPLE_RULES, tmp_dir_);
+    RulesEngine engine(path);
+    EXPECT_EQ(engine.rules_count(), 1u);
+
+    // Replace with a deny-all rule
+    std::ofstream f(path);
+    f << "rules:\n  - id: deny-all\n    deny:\n      publish: [\"#\"]\n      subscribe: [\"#\"]\n";
+    f.close();
+
     engine.reload();
     EXPECT_EQ(engine.rules_count(), 1u);
-    auto r = make_req("CN=x,O=Any", "x", "any/topic", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001/x", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
 }

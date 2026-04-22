@@ -1,74 +1,31 @@
 # EMQX mTLS Authorization Rules
 #
-# Rule matching:
-#   Rules are evaluated in descending specificity order:
-#     O+OU match (6) > OU-only (4) > O-only (2) > wildcard (0)
-#   Within the same specificity level, YAML file order is preserved.
-#   First matching rule wins; if its identity matches but no topic pattern
-#   matches, evaluation falls through to the next (less specific) rule.
+# Zertifikatsformat:
+#   O  = 8-stellige Organisations-ID,  z.B. aabbccdd
+#   OU = 4+4-stellige Einheits-ID,     z.B. 0001-0001
 #
-# match fields:
-#   o:  Certificate O (Organization). Exact match (case-insensitive), or
-#       "*" / omit to match any value.
-#   ou: Certificate OU (Organizational Unit). Same semantics. Omit to match any.
-#       If the certificate contains multiple OU values, any one match suffices.
+# Topicstruktur:
+#   /{o}/{ou}/#   →  z.B. /aabbccdd/0001-0001/sensor/temp
 #
-# Topic patterns:
-#   +      Single-level MQTT wildcard
-#   #      Multi-level MQTT wildcard (must be the last segment)
-#   {cn}   Replaced with the client certificate's Common Name at request time
+# Platzhalter in Topicpatterns:
+#   {o}   wird durch den ersten O-Wert des Zertifikats ersetzt
+#   {ou}  wird durch den ersten OU-Wert des Zertifikats ersetzt
+#   {cn}  wird durch den CN-Wert des Zertifikats ersetzt
+#   +     MQTT single-level wildcard
+#   #     MQTT multi-level wildcard (muss letztes Segment sein)
+#
+# Regelauswertung:
+#   Regeln werden nach Spezifität sortiert (O+OU > O-only > wildcard).
+#   Erste passende Regel gewinnt; kein Treffer im Topicpattern → nächste Regel.
+#   Kein Treffer insgesamt → deny.
 
 rules:
-  # O+OU: AcmeCorp floor-sensor devices
-  - id: acmecorp-floor-sensors
-    match:
-      o: AcmeCorp
-      ou: floor-sensors
+  # Jedes Gerät darf ausschließlich sein eigenes O/OU-Namespace verwenden.
+  # Ein Gerät mit O=aabbccdd und OU=0001-0001 hat Zugriff nur auf:
+  #   /aabbccdd/0001-0001/#
+  - id: device-own-namespace
     allow:
       publish:
-        - sensors/+/data
-        - sensors/+/status
-        - devices/{cn}/telemetry
+        - "/{o}/{ou}/#"
       subscribe:
-        - cmd/sensors/+
-        - devices/{cn}/cmd
-        - config/sensors/#
-
-  # O+OU: AcmeCorp admin users — full access
-  - id: acmecorp-admin
-    match:
-      o: AcmeCorp
-      ou: admin
-    allow:
-      publish:
-        - "#"
-      subscribe:
-        - "#"
-
-  # O-only catch-all: any AcmeCorp device not matched by a more specific rule
-  - id: acmecorp-default
-    match:
-      o: AcmeCorp
-    allow:
-      subscribe:
-        - announcements/#
-        - status/+
-    deny:
-      publish:
-        - "#"
-      subscribe:
-        - cmd/#
-
-  # O+OU: external partner dashboard — read-only sensor data
-  - id: partnerorg-readonly
-    match:
-      o: PartnerOrg
-      ou: dashboard
-    allow:
-      publish: []
-      subscribe:
-        - sensors/#
-        - status/#
-    deny:
-      publish:
-        - "#"
+        - "/{o}/{ou}/#"
