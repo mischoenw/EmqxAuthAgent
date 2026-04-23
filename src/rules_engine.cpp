@@ -126,6 +126,9 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
                              const ParsedDN& dn,
                              const std::string& topic,
                              const std::string& action) {
+    if (action != "publish" && action != "subscribe")
+        return AuthzResult::Deny;
+
     bool is_publish = (action == "publish");
 
     // Build placeholder values from the first O and OU in the cert DN.

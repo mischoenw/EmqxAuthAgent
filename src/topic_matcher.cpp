@@ -23,58 +23,36 @@ static std::vector<std::string> split_slash(const std::string& s) {
     return parts;
 }
 
-static std::string substitute_one(const std::string& s,
-                                   const std::string& placeholder,
-                                   const std::string& escaped_value) {
-    std::string result;
-    size_t pos = 0;
-    while (true) {
-        size_t found = s.find(placeholder, pos);
-        if (found == std::string::npos) { result += s.substr(pos); break; }
-        result += s.substr(pos, found - pos);
-        result += escaped_value;
-        pos = found + placeholder.size();
-    }
-    return result;
-}
-
 static bool has_any_placeholder(const std::string& pattern) {
     return pattern.find("{cn}") != std::string::npos ||
            pattern.find("{o}")  != std::string::npos ||
            pattern.find("{ou}") != std::string::npos;
 }
 
-static std::string substitute_placeholders(const std::string& pattern,
-                                           const TopicPlaceholders& ph) {
-    std::string s = substitute_one(pattern, "{cn}", regex_escape(ph.cn));
-    s             = substitute_one(s,       "{o}",  regex_escape(ph.o));
-    s             = substitute_one(s,       "{ou}", regex_escape(ph.ou));
-    return s;
+// Regex that never matches anything — used when a placeholder value is invalid
+// (e.g. contains '/' which would span multiple MQTT topic levels).
+static std::regex never_match() {
+    return std::regex("a^", std::regex::optimize);
 }
 
-// Build a std::regex from an MQTT topic pattern (after {cn} substitution).
-// Rules:
-//   +  → matches exactly one topic level ([^/]+)
-//   #  → must be last segment; matches the current level and anything below
-//          "sensors/#" → ^sensors(?:/.*)?$
-//          "#"         → ^.*$
-static std::regex build_pattern_regex(const std::string& resolved_pattern) {
-    auto segs = split_slash(resolved_pattern);
+// Build a regex from an MQTT topic pattern.
+// Placeholders are substituted at segment level to avoid double-escaping:
+//   {cn}, {o}, {ou} → regex_escape(value)  (one escape pass, not two)
+// A placeholder value containing '/' returns never_match() because '/' is
+// not a valid character within a single MQTT topic level.
+static std::regex build_pattern_regex(const std::string& pattern,
+                                      const TopicPlaceholders& ph) {
+    auto segs = split_slash(pattern);
     std::string re;
 
     for (size_t i = 0; i < segs.size(); ++i) {
         const auto& seg = segs[i];
 
+        // '#' check must come before the '/' separator so we don't add an
+        // extra slash before the optional-suffix group.
         if (seg == "#") {
-            // Must be last segment (validated separately).
-            if (i == 0) {
-                // Bare '#': match everything.
-                re = ".*";
-            } else {
-                // Pattern like "foo/bar/#": already have "foo/bar" in re,
-                // append optional slash + anything.
-                re += "(?:/.*)?";
-            }
+            if (i == 0) re = ".*";
+            else        re += "(?:/.*)?";
             break;
         }
 
@@ -82,6 +60,15 @@ static std::regex build_pattern_regex(const std::string& resolved_pattern) {
 
         if (seg == "+") {
             re += "[^/]+";
+        } else if (seg == "{cn}") {
+            if (ph.cn.find('/') != std::string::npos) return never_match();
+            re += regex_escape(ph.cn);
+        } else if (seg == "{o}") {
+            if (ph.o.find('/') != std::string::npos) return never_match();
+            re += regex_escape(ph.o);
+        } else if (seg == "{ou}") {
+            if (ph.ou.find('/') != std::string::npos) return never_match();
+            re += regex_escape(ph.ou);
         } else {
             re += regex_escape(seg);
         }
@@ -106,7 +93,7 @@ void precompile_static_pattern(const std::string& pattern) {
     if (has_any_placeholder(pattern)) return;
     std::lock_guard<std::mutex> lock(s_cache_mutex);
     if (!s_pattern_cache.count(pattern))
-        s_pattern_cache.emplace(pattern, build_pattern_regex(pattern));
+        s_pattern_cache.emplace(pattern, build_pattern_regex(pattern, {}));
 }
 
 bool matches_topic(const std::string& pattern,
@@ -118,13 +105,12 @@ bool matches_topic(const std::string& pattern,
         if (it != s_pattern_cache.end())
             return std::regex_match(topic, it->second);
 
-        auto re = build_pattern_regex(pattern);
+        auto re = build_pattern_regex(pattern, {});
         auto [ins_it, _] = s_pattern_cache.emplace(pattern, re);
         return std::regex_match(topic, ins_it->second);
     }
 
-    // Dynamic pattern: substitute cert fields and compile on the fly.
-    std::string resolved = substitute_placeholders(pattern, ph);
-    auto re = build_pattern_regex(resolved);
+    // Placeholder patterns compiled at request time (values vary per device).
+    auto re = build_pattern_regex(pattern, ph);
     return std::regex_match(topic, re);
 }
