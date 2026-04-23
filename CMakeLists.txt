@@ -26,7 +26,7 @@ add_executable(emqx-auth-agent
 
 target_include_directories(emqx-auth-agent PRIVATE src)
 target_link_libraries(emqx-auth-agent PRIVATE
-    Libwebsockets::websockets
+    websockets
     yaml-cpp::yaml-cpp
     nlohmann_json::nlohmann_json
 )
