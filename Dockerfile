@@ -17,14 +17,15 @@ RUN conan profile detect --force && \
     conan install . \
         --build=missing \
         -s build_type=Release \
-        -s compiler.cppstd=17
+        -s compiler.cppstd=17 \
+        --output-folder=cmake-build
 
 # Layer 2: source — invalidated on every source change, cmake build only.
 COPY src/ ./src/
 RUN cmake -B cmake-build \
         -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE=Release/generators/conan_toolchain.cmake && \
+        -DCMAKE_TOOLCHAIN_FILE=cmake-build/conan_toolchain.cmake && \
     cmake --build cmake-build --target emqx-auth-agent
 
 # Test stage (optional target for CI)
