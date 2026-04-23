@@ -12,7 +12,7 @@ endif()
 # Conan's openssl recipe sets cmake_file_name="OpenSSL" (capital O), so
 # CMakeDeps generates OpenSSL-config.cmake — find_package must match that.
 find_package(OpenSSL REQUIRED)
-find_package(libwebsockets REQUIRED)
+find_package(Libwebsockets REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
@@ -26,7 +26,7 @@ add_executable(emqx-auth-agent
 
 target_include_directories(emqx-auth-agent PRIVATE src)
 target_link_libraries(emqx-auth-agent PRIVATE
-    websockets
+    Libwebsockets::websockets
     yaml-cpp::yaml-cpp
     nlohmann_json::nlohmann_json
 )
