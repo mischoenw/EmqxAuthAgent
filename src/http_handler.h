@@ -9,7 +9,6 @@ struct SessionData {
     std::string response;      // serialized JSON response
     bool        complete{false}; // true once body is fully received
     bool        is_reload{false};// true for POST /admin/reload
-    bool        is_health{false};// true for GET /health
 };
 
 // lws protocol definition — register this in the lws_protocols array in main.

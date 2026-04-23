@@ -75,26 +75,19 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
         auto q = uri.find('?');
         if (q != std::string::npos) uri = uri.substr(0, q);
 
-        char method_buf[16] = {};
-        lws_hdr_copy(wsi, method_buf, sizeof(method_buf), WSI_TOKEN_HTTP_METHOD);
-        std::string method(method_buf);
+        bool is_post = lws_hdr_total_length(wsi, WSI_TOKEN_POST_URI) > 0;
 
-        if (uri == "/mqtt/authz" && method == "POST") {
-            // Nothing to do yet — body arrives in subsequent callbacks.
-            lws_http_mark_sse(wsi);  // tell lws we'll handle body manually
+        if (uri == "/mqtt/authz" && is_post) {
             return 0;
         }
-        if (uri == "/health" && (method == "GET" || method.empty())) {
-            sd->is_health = true;
+        if (uri == "/health" && !is_post) {
             auto* engine = get_engine(wsi);
             json resp = {{"status", "ok"},
                          {"rules_count", engine ? engine->rules_count() : 0}};
             return send_response(wsi, HTTP_STATUS_OK, resp.dump());
         }
-        if (uri == "/admin/reload" && method == "POST") {
+        if (uri == "/admin/reload" && is_post) {
             sd->is_reload = true;
-            // Auth check happens in BODY_COMPLETION (after body is read).
-            // If there is no body EMQX shouldn't call this, but handle it anyway.
             return 0;
         }
 
@@ -104,7 +97,7 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
     case LWS_CALLBACK_HTTP_BODY: {
         if (!sd) return 0;
         if (sd->body.size() + len > MAX_BODY) {
-            send_response(wsi, HTTP_STATUS_PAYLOAD_TOO_LARGE,
+            send_response(wsi, 413,
                           R"({"error":"body too large"})");
             return -1;
         }
