@@ -31,5 +31,8 @@ target_link_libraries(emqx-auth-agent PRIVATE
     nlohmann_json::nlohmann_json
 )
 
-enable_testing()
-add_subdirectory(tests)
+option(BUILD_TESTING "Build unit tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

@@ -3,7 +3,8 @@
 FROM amd64/debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        cmake ninja-build g++ python3 python3-pip git ca-certificates && \
+        cmake ninja-build g++ python3 python3-pip git ca-certificates \
+        perl && \
     pip3 install --break-system-packages conan && \
     rm -rf /var/lib/apt/lists/*
 
@@ -21,17 +22,26 @@ RUN conan profile detect --force && \
         --output-folder=cmake-build
 
 # Layer 2: source — invalidated on every source change, cmake build only.
+# BUILD_TESTING=OFF: tests/ is not present in this stage; the test-runner
+# stage below re-configures cmake with testing enabled.
 COPY src/ ./src/
 RUN cmake -B cmake-build \
         -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE=cmake-build/conan_toolchain.cmake && \
+        -DCMAKE_TOOLCHAIN_FILE=cmake-build/conan_toolchain.cmake \
+        -DBUILD_TESTING=OFF && \
     cmake --build cmake-build --target emqx-auth-agent
 
-# Test stage (optional target for CI)
+# Test stage — inherits the Conan packages and cmake build from builder,
+# then re-configures with testing enabled and runs the test suite.
 FROM builder AS test-runner
 COPY tests/ ./tests/
-RUN cmake --build cmake-build --target run_tests && \
+RUN cmake -B cmake-build \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_TOOLCHAIN_FILE=cmake-build/conan_toolchain.cmake \
+        -DBUILD_TESTING=ON && \
+    cmake --build cmake-build --target run_tests && \
     ctest --test-dir cmake-build --output-on-failure
 
 # Runtime stage — minimal image, no build tools
