@@ -7,10 +7,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-O3 -march=x86-64-v2 -mtune=generic)
 endif()
 
-# openssl must be found before libwebsockets: libwebsockets' cmake config
-# references the openssl::openssl target in its INTERFACE_LINK_LIBRARIES,
-# so the target must already exist when find_package(libwebsockets) runs.
-find_package(openssl REQUIRED)
+# OpenSSL must be found before libwebsockets: libwebsockets' cmake config
+# references the openssl::openssl target in its INTERFACE_LINK_LIBRARIES.
+# Conan's openssl recipe sets cmake_file_name="OpenSSL" (capital O), so
+# CMakeDeps generates OpenSSL-config.cmake — find_package must match that.
+find_package(OpenSSL REQUIRED)
 find_package(libwebsockets REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(nlohmann_json REQUIRED)
