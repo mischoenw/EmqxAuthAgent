@@ -3,7 +3,7 @@
 FROM amd64/debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        cmake ninja-build g++ python3 python3-pip git ca-certificates \
+        cmake ninja-build g++ make python3 python3-pip git ca-certificates \
         perl && \
     pip3 install --break-system-packages conan && \
     rm -rf /var/lib/apt/lists/*
