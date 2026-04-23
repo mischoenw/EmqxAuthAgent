@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <mutex>
 
 static std::string str_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
