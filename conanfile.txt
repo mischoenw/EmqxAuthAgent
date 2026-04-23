@@ -9,7 +9,7 @@ CMakeDeps
 CMakeToolchain
 
 [options]
-libwebsockets/*:with_ssl=True
+libwebsockets/*:with_ssl=openssl
 libwebsockets/*:with_http=True
 libwebsockets/*:shared=False
 yaml-cpp/*:shared=False
