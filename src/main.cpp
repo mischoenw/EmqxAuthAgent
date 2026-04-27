@@ -13,14 +13,22 @@ static void sigint_handler(int) { s_interrupted = true; }
 
 int main() {
     // Configuration from environment variables
-    const char* rules_env = std::getenv("RULES_CONFIG");
-    const char* port_env  = std::getenv("PORT");
-    const char* log_env   = std::getenv("LOG_LEVEL");
-    const char* bind_env  = std::getenv("BIND_ADDR");
+    const char* rules_env    = std::getenv("RULES_CONFIG");
+    const char* port_env     = std::getenv("PORT");
+    const char* log_env      = std::getenv("LOG_LEVEL");
+    const char* bind_env     = std::getenv("BIND_ADDR");
+    const char* ssl_cert_env = std::getenv("SSL_CERT");
+    const char* ssl_key_env  = std::getenv("SSL_KEY");
+    const char* ssl_ca_env   = std::getenv("SSL_CA");
 
-    std::string rules_path  = rules_env ? rules_env : "config/rules.yaml";
-    int         port        = port_env  ? std::atoi(port_env) : 8000;
-    const char* bind_addr   = bind_env  ? bind_env  : "127.0.0.1";
+    std::string rules_path = rules_env ? rules_env : "config/rules.yaml";
+    int         port       = port_env  ? std::atoi(port_env) : 8000;
+    const char* bind_addr  = bind_env  ? bind_env  : "127.0.0.1";
+
+    if (!ssl_cert_env || !ssl_key_env || !ssl_ca_env) {
+        std::cerr << "[FATAL] SSL_CERT, SSL_KEY, and SSL_CA must all be set\n";
+        return 1;
+    }
 
     // Suppress lws internal logs unless LOG_LEVEL=DEBUG
     if (!log_env || std::string(log_env) != "DEBUG") {
@@ -45,11 +53,16 @@ int main() {
     };
 
     lws_context_creation_info info{};
-    info.port      = port;
-    info.iface     = bind_addr;
-    info.protocols = protocols;
-    info.user      = engine.get(); // accessible via lws_context_user()
-    info.options   = LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
+    info.port                     = port;
+    info.iface                    = bind_addr;
+    info.protocols                = protocols;
+    info.user                     = engine.get();
+    info.ssl_cert_filepath        = ssl_cert_env;
+    info.ssl_private_key_filepath = ssl_key_env;
+    info.ssl_ca_filepath          = ssl_ca_env;
+    info.options                  = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT
+                                  | LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT
+                                  | LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
 
     lws_context* context = lws_create_context(&info);
     if (!context) {
@@ -57,7 +70,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "[INFO] EmqxAuthAgent listening on " << bind_addr << ":" << port << "\n";
+    std::cout << "[INFO] EmqxAuthAgent listening on https://" << bind_addr << ":" << port << "\n";
 
     std::signal(SIGINT,  sigint_handler);
     std::signal(SIGTERM, sigint_handler);

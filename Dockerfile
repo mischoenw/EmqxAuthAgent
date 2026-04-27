@@ -63,9 +63,13 @@ EXPOSE 8000
 ENV RULES_CONFIG=/app/config/rules.yaml \
     PORT=8000 \
     BIND_ADDR=127.0.0.1 \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=INFO \
+    SSL_CERT=/app/ssl/public.pem \
+    SSL_KEY=/app/ssl/private.key \
+    SSL_CA=/app/ssl/ca-chain.pem
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -sf http://localhost:8000/health || exit 1
+    CMD curl -sf -k --cert "$SSL_CERT" --key "$SSL_KEY" \
+        https://127.0.0.1:${PORT}/health || exit 1
 
 CMD ["emqx-auth-agent"]
