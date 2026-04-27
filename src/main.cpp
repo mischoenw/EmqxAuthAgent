@@ -13,12 +13,14 @@ static void sigint_handler(int) { s_interrupted = true; }
 
 int main() {
     // Configuration from environment variables
-    const char* rules_env  = std::getenv("RULES_CONFIG");
-    const char* port_env   = std::getenv("PORT");
-    const char* log_env    = std::getenv("LOG_LEVEL");
+    const char* rules_env = std::getenv("RULES_CONFIG");
+    const char* port_env  = std::getenv("PORT");
+    const char* log_env   = std::getenv("LOG_LEVEL");
+    const char* bind_env  = std::getenv("BIND_ADDR");
 
-    std::string rules_path = rules_env  ? rules_env  : "config/rules.yaml";
-    int         port       = port_env   ? std::atoi(port_env) : 8000;
+    std::string rules_path  = rules_env ? rules_env : "config/rules.yaml";
+    int         port        = port_env  ? std::atoi(port_env) : 8000;
+    const char* bind_addr   = bind_env  ? bind_env  : "127.0.0.1";
 
     // Suppress lws internal logs unless LOG_LEVEL=DEBUG
     if (!log_env || std::string(log_env) != "DEBUG") {
@@ -44,6 +46,7 @@ int main() {
 
     lws_context_creation_info info{};
     info.port      = port;
+    info.iface     = bind_addr;
     info.protocols = protocols;
     info.user      = engine.get(); // accessible via lws_context_user()
     info.options   = LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
@@ -54,7 +57,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "[INFO] EmqxAuthAgent listening on port " << port << "\n";
+    std::cout << "[INFO] EmqxAuthAgent listening on " << bind_addr << ":" << port << "\n";
 
     std::signal(SIGINT,  sigint_handler);
     std::signal(SIGTERM, sigint_handler);

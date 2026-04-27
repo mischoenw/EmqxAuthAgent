@@ -62,6 +62,7 @@ EXPOSE 8000
 
 ENV RULES_CONFIG=/app/config/rules.yaml \
     PORT=8000 \
+    BIND_ADDR=127.0.0.1 \
     LOG_LEVEL=INFO
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
