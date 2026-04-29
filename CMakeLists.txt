@@ -18,6 +18,7 @@ find_package(nlohmann_json REQUIRED)
 
 add_executable(emqx-auth-agent
     src/main.cpp
+    src/globals.cpp
     src/http_handler.cpp
     src/cert_parser.cpp
     src/topic_matcher.cpp

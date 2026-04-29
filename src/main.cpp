@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 
-bool g_debug = false;
 static volatile bool s_interrupted = false;
 
 static void sigint_handler(int) { s_interrupted = true; }

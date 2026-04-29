@@ -5,6 +5,7 @@ add_executable(run_tests
     test_topic_matcher.cpp
     test_rules_engine.cpp
     # Include the modules under test directly (no separate library target needed)
+    ${CMAKE_SOURCE_DIR}/src/globals.cpp
     ${CMAKE_SOURCE_DIR}/src/cert_parser.cpp
     ${CMAKE_SOURCE_DIR}/src/topic_matcher.cpp
     ${CMAKE_SOURCE_DIR}/src/rules_engine.cpp
