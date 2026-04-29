@@ -2,6 +2,9 @@
 #include <string>
 #include <vector>
 
+// Set to true when LOG_LEVEL=DEBUG. Read by http_handler and rules_engine.
+extern bool g_debug;
+
 struct AuthzRequest {
     std::string username;
     std::string clientid;

@@ -146,19 +146,21 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
         // Explicit deny within matched rule wins over allow
         for (const auto& pat : deny_list) {
             if (matches_topic(pat, topic, ph)) {
-                std::cout << "[DENY] rule=" << rule.id
-                          << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
-                          << " topic=" << topic << " action=" << action
-                          << " deny_pattern=" << pat << "\n";
+                if (g_debug)
+                    std::cout << "[DENY] rule=" << rule.id
+                              << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
+                              << " topic=" << topic << " action=" << action
+                              << " matched_deny=" << pat << "\n";
                 return AuthzResult::Deny;
             }
         }
         for (const auto& pat : allow_list) {
             if (matches_topic(pat, topic, ph)) {
-                std::cout << "[ALLOW] rule=" << rule.id
-                          << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
-                          << " topic=" << topic << " action=" << action
-                          << " allow_pattern=" << pat << "\n";
+                if (g_debug)
+                    std::cout << "[ALLOW] rule=" << rule.id
+                              << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
+                              << " topic=" << topic << " action=" << action
+                              << " matched_allow=" << pat << "\n";
                 return AuthzResult::Allow;
             }
         }
@@ -166,9 +168,10 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
         // less-specific rule (enables layered O+OU / O-only rules)
     }
 
-    std::cout << "[DENY] no matching rule"
-              << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
-              << " topic=" << topic << " action=" << action << "\n";
+    if (g_debug)
+        std::cout << "[DENY] no matching rule"
+                  << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
+                  << " topic=" << topic << " action=" << action << "\n";
     return AuthzResult::Deny;
 }
 

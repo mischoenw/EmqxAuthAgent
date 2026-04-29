@@ -148,7 +148,20 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
             auto j   = json::parse(sd->body);
             auto req = parse_request(j);
 
+            if (g_debug) {
+                std::cout << "[DEBUG] request"
+                          << " action="       << req.action
+                          << " topic="        << req.topic
+                          << " client="       << req.clientid
+                          << " peerhost="     << req.peerhost
+                          << " cert_subject=" << req.cert_subject
+                          << " cert_cn="      << req.cert_cn
+                          << "\n[DEBUG] payload " << sd->body << "\n";
+            }
+
             if (!valid_action(req.action) || req.topic.empty()) {
+                if (g_debug)
+                    std::cout << "[DEBUG] reject — invalid action or empty topic\n";
                 return send_response(wsi, HTTP_STATUS_OK, make_deny());
             }
 
@@ -157,7 +170,10 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
                                  ? make_allow() : make_deny();
             return send_response(wsi, HTTP_STATUS_OK, body);
 
-        } catch (const std::exception&) {
+        } catch (const std::exception& e) {
+            if (g_debug)
+                std::cout << "[DEBUG] parse error: " << e.what()
+                          << " payload=" << sd->body << "\n";
             // Malformed JSON or missing fields → deny (EMQX must always get 200)
             return send_response(wsi, HTTP_STATUS_OK, make_deny());
         }

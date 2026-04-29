@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+bool g_debug = false;
 static volatile bool s_interrupted = false;
 
 static void sigint_handler(int) { s_interrupted = true; }
@@ -30,8 +31,8 @@ int main() {
         return 1;
     }
 
-    // Suppress lws internal logs unless LOG_LEVEL=DEBUG
-    if (!log_env || std::string(log_env) != "DEBUG") {
+    g_debug = log_env && std::string(log_env) == "DEBUG";
+    if (!g_debug) {
         lws_set_log_level(LLL_ERR | LLL_WARN, nullptr);
     }
 
