@@ -35,6 +35,8 @@ int main() {
         lws_set_log_level(LLL_ERR | LLL_WARN, nullptr);
     }
 
+    std::cout << "running at loglevel " + log_env;
+
     // Load rules
     std::unique_ptr<RulesEngine> engine;
     try {
