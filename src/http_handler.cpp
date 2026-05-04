@@ -77,6 +77,8 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
 
         bool is_post = lws_hdr_total_length(wsi, WSI_TOKEN_POST_URI) > 0;
 
+        cout << "Handle " << uri << endl;
+
         if (uri == "/mqtt/authz" && is_post) {
             return 0;
         }
