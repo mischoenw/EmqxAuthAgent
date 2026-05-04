@@ -52,8 +52,8 @@ static AuthzRequest parse_request(const json& j) {
     req.peerhost     = j.value("peerhost",     "");
     req.topic        = j.value("topic",        "");
     req.action       = j.value("action",       "");
-    req.cert_subject = j.value("cert_subject", "");
-    req.cert_cn      = j.value("cert_cn",      "");
+    req.cert_subject = j.value("cert_dn",      "");
+    req.cert_cn      = j.value("cert_dn",      "");
     return req;
 }
 
