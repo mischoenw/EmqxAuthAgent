@@ -52,8 +52,8 @@ static AuthzRequest parse_request(const json& j) {
     req.peerhost     = j.value("peerhost",     "");
     req.topic        = j.value("topic",        "");
     req.action       = j.value("action",       "");
-    req.cert_subject = j.value("cert_dn",      "");
-    req.cert_cn      = j.value("cert_dn",      "");
+    req.cert_subject = j.value("cert_dn",  "");
+    req.cert_cn      = j.value("cert_cn",  "");
     return req;
 }
 
@@ -77,7 +77,8 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
 
         bool is_post = lws_hdr_total_length(wsi, WSI_TOKEN_POST_URI) > 0;
 
-        std::cout << "Handle " << uri << std::endl;
+        if (g_debug)
+            std::cout << "[DEBUG] " << (is_post ? "POST" : "GET") << " " << uri << "\n";
 
         if (uri == "/mqtt/authz" && is_post) {
             return 0;
