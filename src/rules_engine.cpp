@@ -13,10 +13,12 @@ static std::string str_lower(std::string s) {
     return s;
 }
 
-static int compute_specificity(const std::string& o, const std::string& ou) {
+static int compute_specificity(const std::string& o, const std::string& ou,
+                               const std::string& cn) {
     int score = 0;
     if (!o.empty()  && o  != "*") score += 2;
     if (!ou.empty() && ou != "*") score += 4;
+    if (!cn.empty() && cn != "*") score += 1;
     return score;
 }
 
@@ -67,12 +69,14 @@ std::vector<Rule> RulesEngine::load_rules(const std::string& path) {
         if (match) {
             if (match["o"])  r.match_o  = match["o"].as<std::string>();
             if (match["ou"]) r.match_ou = match["ou"].as<std::string>();
+            if (match["cn"]) r.match_cn = match["cn"].as<std::string>();
         }
         // Normalise "*" and absent to empty string (wildcard sentinel)
         if (r.match_o  == "*") r.match_o  = "";
         if (r.match_ou == "*") r.match_ou = "";
+        if (r.match_cn == "*") r.match_cn = "";
 
-        r.specificity = compute_specificity(r.match_o, r.match_ou);
+        r.specificity = compute_specificity(r.match_o, r.match_ou, r.match_cn);
 
         auto allow_node = rn["allow"];
         auto deny_node  = rn["deny"];
@@ -101,7 +105,6 @@ std::vector<Rule> RulesEngine::load_rules(const std::string& path) {
 }
 
 static bool identity_matches(const Rule& rule, const ParsedDN& dn) {
-    // O match
     if (!rule.match_o.empty()) {
         std::string want = str_lower(rule.match_o);
         bool found = false;
@@ -110,7 +113,6 @@ static bool identity_matches(const Rule& rule, const ParsedDN& dn) {
         }
         if (!found) return false;
     }
-    // OU match
     if (!rule.match_ou.empty()) {
         std::string want = str_lower(rule.match_ou);
         bool found = false;
@@ -118,6 +120,9 @@ static bool identity_matches(const Rule& rule, const ParsedDN& dn) {
             if (str_lower(v) == want) { found = true; break; }
         }
         if (!found) return false;
+    }
+    if (!rule.match_cn.empty()) {
+        if (str_lower(dn.cn) != str_lower(rule.match_cn)) return false;
     }
     return true;
 }

@@ -32,8 +32,9 @@ struct Rule {
     std::string id;
     std::string match_o;   // "" = wildcard (any)
     std::string match_ou;  // "" = wildcard (any)
+    std::string match_cn;  // "" = wildcard (any)
     TopicRuleSet topics;
-    int specificity; // O+OU=6, OU-only=4, O-only=2, wildcard=0
+    int specificity; // O+OU+CN=7, O+OU=6, O+CN=3, OU+CN=5, OU=4, O=2, CN=1, wildcard=0
 };
 
 enum class AuthzResult { Allow, Deny };

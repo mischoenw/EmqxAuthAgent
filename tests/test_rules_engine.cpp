@@ -163,6 +163,54 @@ TEST_F(RulesEngineTest, NonAdminFallsToNamespaceRule) {
     EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
 }
 
+// ---- match.cn ----
+
+static const char* CN_RULES = R"yaml(
+rules:
+  - id: specific-device
+    match:
+      o: aabbccdd
+      ou: 0001-0001
+      cn: gateway-01
+    allow:
+      publish:
+        - "/{o}/{ou}/#"
+        - "/gateway/status"
+      subscribe:
+        - "/{o}/{ou}/#"
+
+  - id: device-own-namespace
+    allow:
+      publish:
+        - "/{o}/{ou}/#"
+      subscribe:
+        - "/{o}/{ou}/#"
+)yaml";
+
+TEST_F(RulesEngineTest, CnMatchAllow) {
+    RulesEngine engine(write_rules(CN_RULES, tmp_dir_));
+    // gateway-01 gets the extra publish permission
+    auto r = make_req("CN=gateway-01,OU=0001-0001,O=aabbccdd", "gateway-01",
+                      "/gateway/status", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+}
+
+TEST_F(RulesEngineTest, CnMatchDeniesOtherDevice) {
+    RulesEngine engine(write_rules(CN_RULES, tmp_dir_));
+    // different CN → specific-device rule doesn't match → falls to device-own-namespace
+    // which doesn't allow /gateway/status
+    auto r = make_req("CN=sensor-01,OU=0001-0001,O=aabbccdd", "sensor-01",
+                      "/gateway/status", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+}
+
+TEST_F(RulesEngineTest, CnMatchCaseInsensitive) {
+    RulesEngine engine(write_rules(CN_RULES, tmp_dir_));
+    auto r = make_req("CN=GATEWAY-01,OU=0001-0001,O=aabbccdd", "GATEWAY-01",
+                      "/gateway/status", "publish");
+    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+}
+
 // ---- Metadata ----
 
 TEST_F(RulesEngineTest, RulesCount) {
