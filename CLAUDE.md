@@ -163,3 +163,12 @@ curl -sk --cert ssl/public.pem --key ssl/private.key \
 ```
 
 Connects to `mqtt.mmbr.dev:8884`, extracts O/OU from the cert automatically, and verifies publish/subscribe allow+deny in 6 checks.
+
+## Development workflow
+
+**Always follow this process for every change:**
+
+1. **Branch**: develop on the designated `claude/**` feature branch (e.g. `claude/emqx-mtls-topic-auth-gjaDm`). Never commit directly to `main`.
+2. **Commit**: use clear, descriptive commit messages.
+3. **Push**: `git push -u origin <branch-name>`
+4. **PR**: after every push, create a pull request targeting `main` using `mcp__github__create_pull_request`. This is mandatory — every push must be followed by a PR.
