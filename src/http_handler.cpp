@@ -43,18 +43,11 @@ static int send_response(lws* wsi, int http_status,
 }
 
 static std::string make_response(const AuthzResponse& r) {
-    json resp = {
-        {"result", r.result == AuthzResult::Allow ? "allow" : "deny"},
-        {"client_attrs", {{"o", r.o}, {"ou", r.ou}, {"cn", r.cn}}}
-    };
+    json resp = {{"result", r.result == AuthzResult::Allow ? "allow" : "deny"}};
     return resp.dump();
 }
 
-static std::string make_deny() {
-    AuthzResponse r;
-    r.result = AuthzResult::Deny;
-    return make_response(r);
-}
+static std::string make_deny() { return R"({"result":"deny"})"; }
 
 static AuthzRequest parse_request(const json& j) {
     AuthzRequest req;
