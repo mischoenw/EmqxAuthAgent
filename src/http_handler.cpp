@@ -42,8 +42,19 @@ static int send_response(lws* wsi, int http_status,
     return 0;
 }
 
-static std::string make_deny()  { return R"({"result":"deny"})"; }
-static std::string make_allow() { return R"({"result":"allow"})"; }
+static std::string make_response(const AuthzResponse& r) {
+    json resp = {
+        {"result", r.result == AuthzResult::Allow ? "allow" : "deny"},
+        {"client_attrs", {{"o", r.o}, {"ou", r.ou}, {"cn", r.cn}}}
+    };
+    return resp.dump();
+}
+
+static std::string make_deny() {
+    AuthzResponse r;
+    r.result = AuthzResult::Deny;
+    return make_response(r);
+}
 
 static AuthzRequest parse_request(const json& j) {
     AuthzRequest req;
@@ -168,10 +179,8 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
                 return send_response(wsi, HTTP_STATUS_OK, make_deny());
             }
 
-            AuthzResult result = engine->authorize(req);
-            std::string body   = (result == AuthzResult::Allow)
-                                 ? make_allow() : make_deny();
-            return send_response(wsi, HTTP_STATUS_OK, body);
+            AuthzResponse resp = engine->authorize(req);
+            return send_response(wsi, HTTP_STATUS_OK, make_response(resp));
 
         } catch (const std::exception& e) {
             if (g_debug)

@@ -15,7 +15,7 @@ public:
     explicit RulesEngine(const std::string& config_path);
 
     // Evaluate an authorization request. Thread-safe (shared reader lock).
-    AuthzResult authorize(const AuthzRequest& req) const;
+    AuthzResponse authorize(const AuthzRequest& req) const;
 
     // Reload rules from the config file. Thread-safe (exclusive lock).
     void reload();
