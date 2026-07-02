@@ -38,3 +38,10 @@ struct Rule {
 };
 
 enum class AuthzResult { Allow, Deny };
+
+struct AuthzResponse {
+    AuthzResult result;
+    std::string o;
+    std::string ou;
+    std::string cn;
+};

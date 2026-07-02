@@ -127,20 +127,27 @@ static bool identity_matches(const Rule& rule, const ParsedDN& dn) {
     return true;
 }
 
-static AuthzResult evaluate(const std::vector<Rule>& rules,
-                             const ParsedDN& dn,
-                             const std::string& topic,
-                             const std::string& action) {
-    if (action != "publish" && action != "subscribe")
-        return AuthzResult::Deny;
-
-    bool is_publish = (action == "publish");
-
+static AuthzResponse evaluate(const std::vector<Rule>& rules,
+                               const ParsedDN& dn,
+                               const std::string& topic,
+                               const std::string& action) {
     // Build placeholder values from the first O and OU in the cert DN.
     TopicPlaceholders ph;
     ph.cn = dn.cn;
     ph.o  = dn.o_values.empty()  ? "" : dn.o_values[0];
     ph.ou = dn.ou_values.empty() ? "" : dn.ou_values[0];
+
+    AuthzResponse resp;
+    resp.o  = ph.o;
+    resp.ou = ph.ou;
+    resp.cn = ph.cn;
+
+    if (action != "publish" && action != "subscribe") {
+        resp.result = AuthzResult::Deny;
+        return resp;
+    }
+
+    bool is_publish = (action == "publish");
 
     for (const auto& rule : rules) {
         if (!identity_matches(rule, dn)) continue;
@@ -156,7 +163,8 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
                               << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
                               << " topic=" << topic << " action=" << action
                               << " matched_deny=" << pat << "\n";
-                return AuthzResult::Deny;
+                resp.result = AuthzResult::Deny;
+                return resp;
             }
         }
         for (const auto& pat : allow_list) {
@@ -166,7 +174,8 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
                               << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
                               << " topic=" << topic << " action=" << action
                               << " matched_allow=" << pat << "\n";
-                return AuthzResult::Allow;
+                resp.result = AuthzResult::Allow;
+                return resp;
             }
         }
         // Identity matched but no topic pattern matched → fall through to
@@ -177,13 +186,14 @@ static AuthzResult evaluate(const std::vector<Rule>& rules,
         std::cout << "[DENY] no matching rule"
                   << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
                   << " topic=" << topic << " action=" << action << "\n";
-    return AuthzResult::Deny;
+    resp.result = AuthzResult::Deny;
+    return resp;
 }
 
 RulesEngine::RulesEngine(const std::string& config_path)
     : config_path_(config_path), rules_(load_rules(config_path)) {}
 
-AuthzResult RulesEngine::authorize(const AuthzRequest& req) const {
+AuthzResponse RulesEngine::authorize(const AuthzRequest& req) const {
     std::shared_lock lock(rules_mutex_);
     ParsedDN dn = extract_cert_fields(req.cert_subject, req.cert_cn);
     return evaluate(rules_, dn, req.topic, req.action);

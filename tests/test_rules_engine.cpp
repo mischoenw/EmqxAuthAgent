@@ -78,14 +78,14 @@ TEST_F(RulesEngineTest, AllowPublishOwnNamespace) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0001-0001/sensor/temp", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
 }
 
 TEST_F(RulesEngineTest, AllowSubscribeOwnNamespace) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0001-0001/cmd/restart", "subscribe");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
 }
 
 TEST_F(RulesEngineTest, AllowBaseTopicWithoutSuffix) {
@@ -93,7 +93,7 @@ TEST_F(RulesEngineTest, AllowBaseTopicWithoutSuffix) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0001-0001", "subscribe");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
 }
 
 TEST_F(RulesEngineTest, DenyWrongOU) {
@@ -101,7 +101,7 @@ TEST_F(RulesEngineTest, DenyWrongOU) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0002-0001/sensor/temp", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
 
 TEST_F(RulesEngineTest, DenyWrongO) {
@@ -109,7 +109,7 @@ TEST_F(RulesEngineTest, DenyWrongO) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/bbccddee/0001-0001/sensor/temp", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
 
 TEST_F(RulesEngineTest, DenyMissingLeadingSlash) {
@@ -117,20 +117,20 @@ TEST_F(RulesEngineTest, DenyMissingLeadingSlash) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "aabbccdd/0001-0001/sensor/temp", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
 
 TEST_F(RulesEngineTest, DenyEmptyCertSubject) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("", "", "/aabbccdd/0001-0001/x", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
 
 TEST_F(RulesEngineTest, DenyInvalidAction) {
     RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0001-0001/x", "read");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
 
 // ---- Different devices in same org but different OU are isolated ----
@@ -143,8 +143,8 @@ TEST_F(RulesEngineTest, TwoDevicesIsolated) {
     auto r2 = make_req("CN=d2,OU=0002-0002,O=aabbccdd", "d2",
                        "/aabbccdd/0001-0001/temp", "publish");  // wrong namespace!
 
-    EXPECT_EQ(engine.authorize(r1), AuthzResult::Allow);
-    EXPECT_EQ(engine.authorize(r2), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r1).result, AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r2).result, AuthzResult::Deny);
 }
 
 // ---- Layered rules (O+OU specific + wildcard fallback) ----
@@ -153,14 +153,14 @@ TEST_F(RulesEngineTest, AdminSuperuser) {
     RulesEngine engine(write_rules(LAYERED_RULES, tmp_dir_));
     auto r = make_req("CN=admin1,OU=admin,O=aabbccdd", "admin1",
                       "/any/arbitrary/topic", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
 }
 
 TEST_F(RulesEngineTest, NonAdminFallsToNamespaceRule) {
     RulesEngine engine(write_rules(LAYERED_RULES, tmp_dir_));
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0001-0001/sensor", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
 }
 
 // ---- match.cn ----
@@ -192,7 +192,7 @@ TEST_F(RulesEngineTest, CnMatchAllow) {
     // gateway-01 gets the extra publish permission
     auto r = make_req("CN=gateway-01,OU=0001-0001,O=aabbccdd", "gateway-01",
                       "/gateway/status", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
 }
 
 TEST_F(RulesEngineTest, CnMatchDeniesOtherDevice) {
@@ -201,14 +201,48 @@ TEST_F(RulesEngineTest, CnMatchDeniesOtherDevice) {
     // which doesn't allow /gateway/status
     auto r = make_req("CN=sensor-01,OU=0001-0001,O=aabbccdd", "sensor-01",
                       "/gateway/status", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
 
 TEST_F(RulesEngineTest, CnMatchCaseInsensitive) {
     RulesEngine engine(write_rules(CN_RULES, tmp_dir_));
     auto r = make_req("CN=GATEWAY-01,OU=0001-0001,O=aabbccdd", "GATEWAY-01",
                       "/gateway/status", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Allow);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Allow);
+}
+
+// ---- AuthzResponse client_attrs ----
+
+TEST_F(RulesEngineTest, ResponseAttrsPopulated) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/aabbccdd/0001-0001/temp", "publish");
+    auto resp = engine.authorize(r);
+    EXPECT_EQ(resp.result, AuthzResult::Allow);
+    EXPECT_EQ(resp.o,  "aabbccdd");
+    EXPECT_EQ(resp.ou, "0001-0001");
+    EXPECT_EQ(resp.cn, "dev1");
+}
+
+TEST_F(RulesEngineTest, ResponseAttrsPopulatedOnDeny) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
+                      "/bbccddee/0001-0001/temp", "publish");
+    auto resp = engine.authorize(r);
+    EXPECT_EQ(resp.result, AuthzResult::Deny);
+    EXPECT_EQ(resp.o,  "aabbccdd");
+    EXPECT_EQ(resp.ou, "0001-0001");
+    EXPECT_EQ(resp.cn, "dev1");
+}
+
+TEST_F(RulesEngineTest, ResponseAttrsEmptyOnMissingCert) {
+    RulesEngine engine(write_rules(SAMPLE_RULES, tmp_dir_));
+    auto r = make_req("", "", "/any/topic", "publish");
+    auto resp = engine.authorize(r);
+    EXPECT_EQ(resp.result, AuthzResult::Deny);
+    EXPECT_EQ(resp.o,  "");
+    EXPECT_EQ(resp.ou, "");
+    EXPECT_EQ(resp.cn, "");
 }
 
 // ---- Metadata ----
@@ -233,5 +267,5 @@ TEST_F(RulesEngineTest, Reload) {
 
     auto r = make_req("CN=dev1,OU=0001-0001,O=aabbccdd", "dev1",
                       "/aabbccdd/0001-0001/x", "publish");
-    EXPECT_EQ(engine.authorize(r), AuthzResult::Deny);
+    EXPECT_EQ(engine.authorize(r).result, AuthzResult::Deny);
 }
