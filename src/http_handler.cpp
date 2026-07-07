@@ -168,7 +168,7 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
 
             if (!valid_action(req.action) || req.topic.empty()) {
                 if (g_debug)
-                    std::cout << "[DEBUG] reject — invalid action or empty topic\n";
+                    std::cout << "[DEBUG] reject — invalid action or empty topic" << std::endl;
                 return send_response(wsi, HTTP_STATUS_OK, make_deny());
             }
 
