@@ -162,7 +162,7 @@ static AuthzResponse evaluate(const std::vector<Rule>& rules,
                     std::cout << "[DENY] rule=" << rule.id
                               << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
                               << " topic=" << topic << " action=" << action
-                              << " matched_deny=" << pat << "\n";
+                              << " matched_deny=" << pat << std::endl;
                 resp.result = AuthzResult::Deny;
                 return resp;
             }
@@ -173,7 +173,7 @@ static AuthzResponse evaluate(const std::vector<Rule>& rules,
                     std::cout << "[ALLOW] rule=" << rule.id
                               << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
                               << " topic=" << topic << " action=" << action
-                              << " matched_allow=" << pat << "\n";
+                              << " matched_allow=" << pat << std::endl;
                 resp.result = AuthzResult::Allow;
                 return resp;
             }
@@ -185,7 +185,7 @@ static AuthzResponse evaluate(const std::vector<Rule>& rules,
     if (g_debug)
         std::cout << "[DENY] no matching rule"
                   << " o=" << ph.o << " ou=" << ph.ou << " cn=" << ph.cn
-                  << " topic=" << topic << " action=" << action << "\n";
+                  << " topic=" << topic << " action=" << action << std::endl;
     resp.result = AuthzResult::Deny;
     return resp;
 }

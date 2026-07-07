@@ -82,7 +82,7 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
         bool is_post = lws_hdr_total_length(wsi, WSI_TOKEN_POST_URI) > 0;
 
         if (g_debug)
-            std::cout << "[DEBUG] " << (is_post ? "POST" : "GET") << " " << uri << "\n";
+            std::cout << "[DEBUG] " << (is_post ? "POST" : "GET") << " " << uri << std::endl;
 
         if (uri == "/mqtt/authz" && is_post) {
             return 0;
@@ -163,7 +163,7 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
                           << " peerhost="     << req.peerhost
                           << " cert_subject=" << req.cert_subject
                           << " cert_cn="      << req.cert_cn
-                          << "\n[DEBUG] payload " << sd->body << "\n";
+                          << "\n[DEBUG] payload " << sd->body << std::endl;
             }
 
             if (!valid_action(req.action) || req.topic.empty()) {
@@ -178,7 +178,7 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
         } catch (const std::exception& e) {
             if (g_debug)
                 std::cout << "[DEBUG] parse error: " << e.what()
-                          << " payload=" << sd->body << "\n";
+                          << " payload=" << sd->body << std::endl;
             // Malformed JSON or missing fields → deny (EMQX must always get 200)
             return send_response(wsi, HTTP_STATUS_OK, make_deny());
         }

@@ -42,9 +42,9 @@ int main() {
     try {
         engine = std::make_unique<RulesEngine>(rules_path);
         std::cout << "[INFO] Loaded " << engine->rules_count()
-                  << " rules from " << rules_path << "\n";
+                  << " rules from " << rules_path << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "[FATAL] Failed to load rules: " << e.what() << "\n";
+        std::cerr << "[FATAL] Failed to load rules: " << e.what() << std::endl;
         return 1;
     }
 
@@ -72,7 +72,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "[INFO] EmqxAuthAgent listening on https://" << bind_addr << ":" << port << "\n";
+    std::cout << "[INFO] EmqxAuthAgent listening on https://" << bind_addr << ":" << port << std::endl;
 
     std::signal(SIGINT,  sigint_handler);
     std::signal(SIGTERM, sigint_handler);
