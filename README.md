@@ -286,7 +286,7 @@ emqx ctl conf reload
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/mqtt/authz` | Authorization endpoint called by EMQX |
-| `GET` | `/health` | Returns `{"status":"ok","rules_count":N}` |
+| `GET` | `/health` | Returns `204 No Content` |
 | `POST` | `/admin/reload` | Reloads `rules.yaml` without restart; requires `Authorization: Bearer <token>` |
 
 ## Debugging

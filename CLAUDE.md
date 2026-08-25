@@ -53,7 +53,7 @@ The binary refuses to start if `SSL_CERT`, `SSL_KEY`, or `SSL_CA` are unset.
 ## HTTP endpoints
 
 - `POST /mqtt/authz` — main authorization endpoint (called by EMQX)
-- `GET  /health` — `{"status":"ok","rules_count":N}`
+- `GET  /health` — `204 No Content`
 - `POST /admin/reload` — hot-reload `rules.yaml`; requires `Authorization: Bearer <ADMIN_TOKEN>`
 
 ## Request JSON fields

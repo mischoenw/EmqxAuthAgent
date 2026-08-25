@@ -88,10 +88,7 @@ int http_callback(lws* wsi, lws_callback_reasons reason,
             return 0;
         }
         if (uri == "/health" && !is_post) {
-            auto* engine = get_engine(wsi);
-            json resp = {{"status", "ok"},
-                         {"rules_count", engine ? engine->rules_count() : 0}};
-            return send_response(wsi, HTTP_STATUS_OK, resp.dump());
+            return send_response(wsi, HTTP_STATUS_NO_CONTENT, "");
         }
         if (uri == "/admin/reload" && is_post) {
             sd->is_reload = true;
